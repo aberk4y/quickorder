@@ -199,4 +199,7 @@ This project was developed for educational and demonstration purposes.
 # ✨ Authors
 
 * Berkay Aras
-* Team QuickOrder
+* Emrullah Yıldız
+* Ali Zeynel Sönmez
+* Hüseyin Kaba
+* Kerem Doruk Akar
