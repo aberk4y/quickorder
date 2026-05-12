@@ -6,9 +6,9 @@ import {
 } from "../controllers/orderController.js";
 
 const router = express.Router();
-router.put("/:id", updateOrderStatus);
-router.post("/", createOrder);
 
-router.get("/", getOrders);
+router.get("/", getOrders);               // Siparişleri listeler
+router.post("/", createOrder);            // Yeni sipariş oluşturur
+router.patch("/:id", updateOrderStatus);  // Sipariş durumunu günceller
 
 export default router;
