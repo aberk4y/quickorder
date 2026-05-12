@@ -52,44 +52,41 @@ function OrderStatusPage() {
     };
   }, []);
 
+  // Sipariş durumu "Hazır" olduğunda bildirim tetikler
   useEffect(() => {
-   if (
-    previousStatus &&
-    previousStatus !== activeOrder?.status &&
-    activeOrder?.status === "Hazır" &&
-    !isMuted
-   ) {
-    const audio = new Audio(
-      "https://actions.google.com/sounds/v1/alarms/medium_bell_ringing_near.ogg"
-    );
+    if (
+      previousStatus &&
+      previousStatus !== activeOrder?.status &&
+      activeOrder?.status === "Hazır" &&
+      !isMuted
+    ) {
+      // Sipariş hazır olduğunda çalacak olan zil sesi
+      const audio = new Audio(
+        "https://actions.google.com/sounds/v1/alarms/medium_bell_ringing_near.ogg"
+      );
 
-    audio.volume = 1;
-    audio.loop = true;
-    audio.play();
-    setNotificationAudio(audio);
+      audio.volume = 1;
+      audio.loop = true;
+      audio.play();
+      setNotificationAudio(audio);
   
-    if (navigator.vibrate) {
-      navigator.vibrate([
-       300,
-       200,
-       300,
-       200,
-       500,
-     ]);
+      // Mobil cihazlar için titreşim bildirimi
+      if (navigator.vibrate) {
+        navigator.vibrate([300, 200, 300, 200, 500]);
+      }
     }
-    
-  }
 
-  setPreviousStatus(activeOrder?.status);
- }, [activeOrder]);
+    // Bir sonraki kontrol için mevcut durumu kaydet
+    setPreviousStatus(activeOrder?.status);
+  }, [activeOrder]);
 
+  // Sipariş yoksa uyarı ekranını göster
   if (!activeOrder) {
     return (
       <div
         style={{
           minHeight: "100vh",
-          background:
-            "linear-gradient(to bottom, #0f172a, #020617)",
+          background: "linear-gradient(to bottom, #0f172a, #020617)",
           color: "white",
           display: "flex",
           justifyContent: "center",
@@ -100,7 +97,7 @@ function OrderStatusPage() {
         <div
           style={{
             background: "#111827",
-            boxShadow:"0 20px 40px rgba(0,0,0,0.45)",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.45)",
             padding: "30px",
             borderRadius: "24px",
             textAlign: "center",
@@ -109,26 +106,19 @@ function OrderStatusPage() {
           }}
         >
           <h1>Aktif Sipariş Yok</h1>
-
-          <p>
-            Yeni sipariş oluşturabilirsiniz.
-          </p>
+          <p>Yeni sipariş oluşturabilirsiniz.</p>
         </div>
       </div>
     );
   }
 
-  const statusColor =
-    activeOrder.status === "Hazır"
-      ? "#22c55e"
-      : "#f97316";
+  const statusColor = activeOrder.status === "Hazır" ? "#22c55e" : "#f97316";
 
   return (
     <div
       style={{
         minHeight: "100vh",
-        background:
-          "linear-gradient(to bottom, #0f172a, #020617)",
+        background: "linear-gradient(to bottom, #0f172a, #020617)",
         color: "white",
         display: "flex",
         justifyContent: "center",
@@ -139,27 +129,17 @@ function OrderStatusPage() {
       <div
         style={{
           background: "#111827",
-          boxShadow:"0 20px 40px rgba(0,0,0,0.45)",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.45)",
           padding: "30px",
           borderRadius: "24px",
           width: "100%",
           maxWidth: "420px",
-          border:
-            "1px solid rgba(255,255,255,0.08)",
+          border: "1px solid rgba(255,255,255,0.08)",
           textAlign: "center",
         }}
       >
-        <h1
-          style={{
-            marginBottom: "10px",
-          }}
-        >
-          Sipariş Takibi
-        </h1>
-
-        <h2>
-          Masa {activeOrder?.tableId}
-        </h2>
+        <h1 style={{ marginBottom: "10px" }}>Sipariş Takibi</h1>
+        <h2>Masa {activeOrder?.tableId}</h2>
 
         <div
           style={{
@@ -172,53 +152,40 @@ function OrderStatusPage() {
               activeOrder.status === "Hazır"
                 ? "0 0 18px #22c55e"
                 : "0 0 18px #f97316",
-              }}
+          }}
         >
           {activeOrder.status}
         </div>
 
-        <p
+        <p style={{ marginTop: "20px", color: "#cbd5e1" }}>Siparişiniz takip ediliyor</p>
+        
+        {/* Müşteri "Geliyorum" butonuna bastığında sesi durdurur */}
+        <button
+          onClick={() => {
+            if (notificationAudio) {
+              notificationAudio.pause();
+              notificationAudio.currentTime = 0;
+            }
+            setCustomerComing(true);
+          }}
+          disabled={customerComing}
           style={{
             marginTop: "20px",
-            color: "#cbd5e1",
+            border: "none",
+            background: customerComing ? "#334155" : "#22c55e",
+            color: "white",
+            padding: "14px 24px",
+            borderRadius: "999px",
+            cursor: "pointer",
+            fontWeight: "bold",
+            fontSize: "16px",
+            transform: customerComing ? "scale(0.96)" : "scale(1)",
+            transition: "all 0.25s ease",
+            opacity: customerComing ? 0.8 : 1,
           }}
         >
-          Siparişiniz takip ediliyor
-        </p>
-        <button
-  onClick={() => {
-    if (notificationAudio) {
-      notificationAudio.pause();
-
-      notificationAudio.currentTime = 0;
-    }
-
-    setCustomerComing(true);
-  }}
-  disabled={customerComing}
-  style={{
-    marginTop: "20px",
-    border: "none",
-    background: customerComing
-      ? "#334155"
-      : "#22c55e",
-    color: "white",
-    padding: "14px 24px",
-    borderRadius: "999px",
-    cursor: "pointer",
-    fontWeight: "bold",
-    fontSize: "16px",
-    transform: customerComing
-      ? "scale(0.96)"
-      : "scale(1)",
-    transition: "all 0.25s ease",
-    opacity: customerComing ? 0.8 : 1,
-  }}
->
-  {customerComing
-    ? "Geliyorum 👍"
-    : "Tamam Geliyorum"}
-</button>
+          {customerComing ? "Geliyorum 👍" : "Tamam Geliyorum"}
+        </button>
 
         <div
           style={{
