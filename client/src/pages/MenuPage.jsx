@@ -1,16 +1,23 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { API_URL } from "../config/api";
+
+/**
+ * MenuPage Bileşeni
+ * Müşterilerin masaya özel QR kod üzerinden menüyü görüntülediği,
+ * kategorilere göre filtreleme yaptığı ve sepet oluşturduğu ana sayfa.
+ */
 function MenuPage() {
+  // URL'den masa ID'sini dinamik olarak alıyoruz
   const { tableId } = useParams();
 
+  // Ürünler, sepet ve kategori filtreleme için state tanımlamaları
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
-  
-  const [selectedCategory, setSelectedCategory] =
-  useState("Tümü");
+  const [selectedCategory, setSelectedCategory] = useState("Tümü");
 
+  // Sayfa ilk açıldığında API üzerinden tüm ürün listesini getir
   useEffect(() => {
     fetch(`${API_URL}/products`)
       .then((res) => res.json())
