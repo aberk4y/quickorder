@@ -2,27 +2,30 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import { API_URL } from "../config/api";
+
+/**
+ * OrderStatusPage Bileşeni
+ * Müşterinin verdiği siparişin durumunu (Hazırlanıyor, Hazır vb.) 
+ * canlı olarak takip edebildiği sayfa.
+ */
 function OrderStatusPage() {
   const { tableId } = useParams();
+  // Socket.io bağlantısını başlatıyoruz
   const socket = io(API_URL);
 
-  const [activeOrder, setActiveOrder] =
-    useState(null);
-  
-  const [isMuted, setIsMuted] =
-    useState(false);
+  // Sipariş verileri ve bildirim durumları için state tanımlamaları
+  const [activeOrder, setActiveOrder] = useState(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [previousStatus, setPreviousStatus] = useState(null);
+  const [notificationAudio, setNotificationAudio] = useState(null);
+  const [customerComing, setCustomerComing] = useState(false);
 
-  const [previousStatus, setPreviousStatus] =
-    useState(null);
-  const [notificationAudio, setNotificationAudio] =
-    useState(null);
-  
-  const [customerComing, setCustomerComing] =
-  useState(false);
-
+  /**
+   * Mevcut sipariş verilerini API'den çeker
+   * Masa ID'sine göre filtrelenmiş ve henüz teslim edilmemiş siparişi bulur.
+   */
   const fetchOrder = async () => {
     const response = await fetch(`${API_URL}/orders`);
-
     const data = await response.json();
 
     const order = data.find(
@@ -34,19 +37,19 @@ function OrderStatusPage() {
     setActiveOrder(order);
   };
 
+  // Sayfa yüklendiğinde siparişi çek ve Socket.io dinleyicisini başlat
   useEffect(() => {
-   fetchOrder();
+    fetchOrder();
 
-   socket.on(
-    "orderUpdated",
-    () => {
+    // Mutfak tarafından sipariş güncellendiğinde tetiklenir
+    socket.on("orderUpdated", () => {
       fetchOrder();
-    }
-   );
+    });
 
-   return () => {
-    socket.off("orderUpdated");
-   };
+    // Bileşen kapandığında socket bağlantısını temizle
+    return () => {
+      socket.off("orderUpdated");
+    };
   }, []);
 
   useEffect(() => {
