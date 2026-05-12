@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { API_URL } from "../config/api";
 
 /**
@@ -10,6 +10,7 @@ import { API_URL } from "../config/api";
 function MenuPage() {
   // URL'den masa ID'sini dinamik olarak alıyoruz
   const { tableId } = useParams();
+  const navigate = useNavigate();
 
   // Ürünler, sepet ve kategori filtreleme için state tanımlamaları
   const [products, setProducts] = useState([]);
@@ -24,6 +25,10 @@ function MenuPage() {
       .then((data) => setProducts(data));
   }, []);
 
+  /**
+   * Sepete Ürün Ekleme (veya miktarını artırma)
+   * @param {Object} product - Eklenen ürün nesnesi
+   */
   const addToCart = (product) => {
     const existingProduct = cart.find(
       (item) => item.id === product.id
@@ -51,6 +56,11 @@ function MenuPage() {
     }
   };
 
+  /**
+   * Sepetten Ürün Çıkarma (veya miktarını azaltma)
+   * Miktar 0'a ulaştığında ürünü sepetten tamamen kaldırır.
+   * @param {number|string} productId - Çıkarılan ürünün ID'si
+   */
   const removeFromCart = (productId) => {
     setCart(
       cart
@@ -124,7 +134,8 @@ const filteredProducts =
         return;
       }
 
-      window.location.href = `/status/${tableId}`;
+      // SPA yapısına uygun olarak baştan yükleme yapmadan yönlendir
+      navigate(`/status/${tableId}`);
 
       setCart([]);
       setShowCart(false);
