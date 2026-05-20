@@ -233,6 +233,27 @@ function KitchenPage() {
                 )}
               </div>
 
+              {/* Sipariş Notu (Eğer varsa şık bir uyarı kutusunda gösterilir) */}
+              {order.note && (
+                <div
+                  style={{
+                    background: "rgba(234, 88, 12, 0.15)",
+                    borderLeft: "4px solid #ea580c",
+                    padding: "12px",
+                    borderRadius: "8px",
+                    marginBottom: "20px",
+                    textAlign: "left",
+                  }}
+                >
+                  <strong style={{ color: "#ea580c", fontSize: "14px", display: "block", marginBottom: "4px" }}>
+                    Sipariş Notu:
+                  </strong>
+                  <span style={{ color: "#f1f5f9", fontSize: "14px" }}>
+                    {order.note}
+                  </span>
+                </div>
+              )}
+
               <h3
                 style={{
                   marginBottom: "20px",
@@ -400,6 +421,24 @@ function KitchenPage() {
                           }
                         </div>
                       )
+                    )}
+
+                    {/* Tamamlanmış siparişlerde not geçmişi */}
+                    {order.note && (
+                      <div
+                        style={{
+                          background: "rgba(255, 255, 255, 0.05)",
+                          borderLeft: "3px solid #94a3b8",
+                          padding: "8px 12px",
+                          borderRadius: "6px",
+                          marginTop: "12px",
+                          textAlign: "left",
+                        }}
+                      >
+                        <strong style={{ color: "#cbd5e1", fontSize: "12px", display: "block" }}>
+                          Not: {order.note}
+                        </strong>
+                      </div>
                     )}
 
                     <h4
