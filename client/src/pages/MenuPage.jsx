@@ -76,40 +76,49 @@ function MenuPage() {
     );
   };
 
+  // Sepetteki tüm ürünlerin toplam fiyatını hesapla
   const totalPrice = cart.reduce(
     (total, item) =>
       total + item.price * item.quantity,
     0
   );
+  // Türkçe kategori isimlerini backend'deki İngilizce karşılıklarıyla eşleştir
   const categoryMap = {
-  Burger: "Burger",
-  Pizza: "Pizza",
-  Döner: "Doner",
-  İçecek: "Drink",
-  Tatlı: "Dessert",
-  Atıştırmalık: "Snack",
-};
+    Burger: "Burger",
+    Pizza: "Pizza",
+    Döner: "Doner",
+    İçecek: "Drink",
+    Tatlı: "Dessert",
+    Atıştırmalık: "Snack",
+  };
 
-const filteredProducts =
-  selectedCategory === "Tümü"
-    ? products
-    : products.filter(
-        (product) =>
-          product.category ===
-          categoryMap[selectedCategory]
-      );
+  // Seçili kategoriye göre ürün listesini filtrele
+  const filteredProducts =
+    selectedCategory === "Tümü"
+      ? products
+      : products.filter(
+          (product) =>
+            product.category ===
+            categoryMap[selectedCategory]
+        );
 
- const totalItems = cart.reduce(
+  // Sepetteki toplam ürün adedini hesapla (navbar badge için)
+  const totalItems = cart.reduce(
     (total, item) => total + item.quantity,
     0
   );
 
+  /**
+   * Sipariş Oluşturma
+   * Sepetteki ürünleri API'ye gönderir ve başarılı olursa sipariş takip sayfasına yönlendirir.
+   */
   const createOrder = async () => {
     if (cart.length === 0) {
       alert("Sepet boş");
       return;
     }
 
+    // Sipariş verisi: masa numarası, ürünler ve toplam fiyat
     const orderData = {
       tableId,
       items: cart,
@@ -117,8 +126,9 @@ const filteredProducts =
     };
 
     try {
+      // Sipariş verisini API'ye gönder
       const response = await fetch(
-        "http://localhost:5000/orders",
+        `${API_URL}/orders`,
         {
           method: "POST",
           headers: {
@@ -155,6 +165,7 @@ const filteredProducts =
         paddingBottom: "120px",
       }}
     >
+      {/* Üst başlık alanı - sayfanın üstüne sabitlenmiş (sticky) */}
       <div
         style={{
           position: "sticky",
@@ -194,6 +205,7 @@ const filteredProducts =
           gap: "20px",
         }}
       >
+      {/* Kategori filtreleme butonları */}
        <div
   style={{
     display: "flex",
@@ -236,6 +248,7 @@ const filteredProducts =
     </button>
   ))}
 </div>
+        {/* Ürün kartları listesi */}
         {filteredProducts.map((product) => {
           const cartItem = cart.find(
             (item) => item.id === product.id
@@ -390,6 +403,7 @@ const filteredProducts =
         })}
       </div>
 
+      {/* Sabit alt sepet paneli - sepette ürün varsa görünür */}
       {cart.length > 0 && (
         <div
           style={{
