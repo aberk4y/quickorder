@@ -17,6 +17,7 @@ function MenuPage() {
   const [cart, setCart] = useState([]);
   const [showCart, setShowCart] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("Tümü");
+  const [note, setNote] = useState("");
 
   // Sayfa ilk açıldığında API üzerinden tüm ürün listesini getir
   useEffect(() => {
@@ -118,11 +119,12 @@ function MenuPage() {
       return;
     }
 
-    // Sipariş verisi: masa numarası, ürünler ve toplam fiyat
+    // Sipariş verisi: masa numarası, ürünler, toplam fiyat ve müşteri notu
     const orderData = {
       tableId,
       items: cart,
       totalPrice,
+      note,
     };
 
     try {
@@ -149,6 +151,7 @@ function MenuPage() {
 
       setCart([]);
       setShowCart(false);
+      setNote("");
     } catch (error) {
       console.error(error);
       alert("Order failed");
@@ -496,6 +499,31 @@ function MenuPage() {
               ))}
             </div>
           )}
+
+          {/* Sipariş Notu Giriş Alanı */}
+          <div style={{ marginBottom: "14px" }}>
+            <textarea
+              placeholder="Sipariş notu ekleyin (örn: acısız olsun, ketçap mayonez bol olsun...)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              style={{
+                width: "100%",
+                height: "60px",
+                padding: "12px",
+                borderRadius: "14px",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+                background: "#1e293b",
+                color: "white",
+                fontSize: "14px",
+                resize: "none",
+                outline: "none",
+                boxSizing: "border-box",
+                transition: "border-color 0.2s",
+              }}
+              onFocus={(e) => (e.target.style.borderColor = "#22c55e")}
+              onBlur={(e) => (e.target.style.borderColor = "rgba(255, 255, 255, 0.1)")}
+            />
+          </div>
 
           <button
             onClick={createOrder}
