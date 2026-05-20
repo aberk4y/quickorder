@@ -11,14 +11,15 @@ import { API_URL } from "../config/api";
 function OrderStatusPage() {
   const { tableId } = useParams();
   const navigate = useNavigate();
-  const socket = io(API_URL);
 
-  // Sipariş verileri, geçmiş durumlar ve buton onay durumları için state'ler
+  // Sipariş verileri, saniye sayacı, socket ve hatırlatıcı durumları için state'ler
   const [activeOrders, setActiveOrders] = useState([]);
   const [previousStatuses, setPreviousStatuses] = useState({});
-  const [comingOrders, setComingOrders] = useState({});
+  const [remindedOrders, setRemindedOrders] = useState({});
   const [isMuted, setIsMuted] = useState(false);
   const [notificationAudio, setNotificationAudio] = useState(null);
+  const [tick, setTick] = useState(0);
+  const [socket, setSocket] = useState(null);
 
   /**
    * Mevcut sipariş verilerini API'den çeker
@@ -41,20 +42,41 @@ function OrderStatusPage() {
     }
   };
 
-  // Sayfa yüklendiğinde siparişleri çek ve Socket.io dinleyicisini başlat
+  // Sayfa yüklendiğinde siparişleri çek ve Socket.io dinleyicisini başlat (Bellek sızıntısı önlenmiştir)
   useEffect(() => {
     fetchOrders();
 
+    const newSocket = io(API_URL);
+    setSocket(newSocket);
+
     // Mutfak tarafından sipariş güncellendiğinde tetiklenir
-    socket.on("orderUpdated", () => {
+    newSocket.on("orderUpdated", () => {
       fetchOrders();
     });
 
     // Bileşen kapandığında socket bağlantısını temizle
     return () => {
-      socket.off("orderUpdated");
+      newSocket.off("orderUpdated");
+      newSocket.disconnect();
     };
   }, []);
+
+  // Zamanın canlı akması için her saniye bileşeni güncelleyen sayaç tetikleyici
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Bileşenden ayrılındığında veya ses nesnesi değiştiğinde sesi durdurup temizleme
+  useEffect(() => {
+    return () => {
+      if (notificationAudio) {
+        notificationAudio.pause();
+      }
+    };
+  }, [notificationAudio]);
 
   // Sipariş durumu "Hazır" olduğunda sesli ve titreşimli bildirim tetikler
   useEffect(() => {
@@ -73,7 +95,7 @@ function OrderStatusPage() {
     setPreviousStatuses(newStatuses);
 
     if (shouldRing && !isMuted) {
-      // Sipariş hazır olduğunda çalacak olan çağrı zili sesi
+      // Sipariş hazır olduğunda çalacak olan çağrı zili sesi (Kullanıcı kapatana kadar çalar)
       const audio = new Audio(
         "https://actions.google.com/sounds/v1/alarms/medium_bell_ringing_near.ogg"
       );
@@ -158,9 +180,9 @@ function OrderStatusPage() {
           100% { transform: rotate(360deg); }
         }
         @keyframes pulse-glowing {
-          0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
-          70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+          0% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.5); }
+          70% { box-shadow: 0 0 0 10px rgba(234, 88, 12, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0); }
         }
       `}</style>
 
@@ -197,7 +219,17 @@ function OrderStatusPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: "24px", width: "100%", maxWidth: "450px" }}>
         {activeOrders.map((order, index) => {
           const statusColor = order.status === "Hazır" ? "#22c55e" : "#f97316";
-          const isComing = comingOrders[order.id] || false;
+          const isReminded = remindedOrders[order.id] || false;
+
+          // Sipariş verilmesinden bu yana geçen süreyi hesaplama
+          const elapsedMs = Date.now() - new Date(order.createdAt).getTime();
+          const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+          const minutes = Math.floor(elapsedSeconds / 60);
+          const seconds = elapsedSeconds % 60;
+          const formattedTime = `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
+
+          // Testi kolaylaştırmak adına: 1 dakikayı (60 saniye) aşınca siparişim nerede butonu aktif olsun
+          const showReminderButton = elapsedSeconds >= 60;
 
           return (
             <div
@@ -216,7 +248,7 @@ function OrderStatusPage() {
                   SİPARİŞ #{activeOrders.length - index}
                 </span>
                 <span style={{ fontSize: "12px", color: "#64748b" }}>
-                  {new Date(order.createdAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                  Geçen Süre: {formattedTime}
                 </span>
               </div>
 
@@ -254,45 +286,82 @@ function OrderStatusPage() {
                       animation: "spin 1s linear infinite",
                     }}
                   />
-                  <p style={{ margin: 0, color: "#94a3b8", fontSize: "13px" }}>
+                  <p style={{ margin: 0, color: "#cbd5e1", fontSize: "13px", fontWeight: "500" }}>
                     Siparişiniz mutfakta özenle hazırlanıyor... 👨‍🍳
                   </p>
+
+                  {/* 1 Dakikayı Aşınca Beliren "Siparişim Nerede?" Butonu */}
+                  {showReminderButton && (
+                    <div style={{ marginTop: "12px", width: "100%" }}>
+                      <button
+                        onClick={() => {
+                          setRemindedOrders({ ...remindedOrders, [order.id]: true });
+                          // Socket üzerinden mutfağa acil uyarı gönder
+                          if (socket) {
+                            socket.emit("orderReminder", { id: order.id, tableId });
+                          }
+                        }}
+                        disabled={isReminded}
+                        style={{
+                          border: "none",
+                          background: isReminded ? "#1e293b" : "linear-gradient(to right, #ea580c, #c2410c)",
+                          color: "white",
+                          padding: "10px 20px",
+                          borderRadius: "10px",
+                          cursor: "pointer",
+                          fontWeight: "700",
+                          fontSize: "13px",
+                          animation: isReminded ? "none" : "pulse-glowing 2s infinite",
+                          transition: "all 0.3s ease",
+                          width: "100%"
+                        }}
+                      >
+                        {isReminded ? "Mutfak Ekibi Uyarıldı! ⚡" : "Siparişim Nerede? ⏳"}
+                      </button>
+                      <p style={{ marginTop: "6px", color: isReminded ? "#ea580c" : "#94a3b8", fontSize: "12px", margin: "4px 0 0 0" }}>
+                        {isReminded 
+                          ? "Mutfak personeline aciliyet bildirimi gönderildi." 
+                          : "Süre beklentiyi aştıysa mutfağa hatırlatma gönderebilirsiniz."}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* SIPARIŞ HAZIR AŞAMASI (Ritmik Parıldayan Buton) */}
+              {/* SIPARIŞ HAZIR AŞAMASI (Garson Masaya Getiriyor Mesajı) */}
               {order.status === "Hazır" && (
-                <div style={{ marginTop: "18px" }}>
-                  <button
-                    onClick={() => {
-                      if (notificationAudio) {
-                        notificationAudio.pause();
-                        notificationAudio.currentTime = 0;
-                      }
-                      setComingOrders({ ...comingOrders, [order.id]: true });
-                    }}
-                    disabled={isComing}
-                    style={{
-                      border: "none",
-                      background: isComing ? "#1e293b" : "linear-gradient(to right, #22c55e, #16a34a)",
-                      color: "white",
-                      padding: "12px 24px",
-                      borderRadius: "12px",
-                      cursor: "pointer",
-                      fontWeight: "800",
-                      fontSize: "14px",
-                      boxShadow: isComing ? "none" : "0 6px 12px rgba(22, 163, 74, 0.25)",
-                      animation: isComing ? "none" : "pulse-glowing 2s infinite",
-                      transition: "all 0.3s ease",
-                    }}
-                  >
-                    {isComing ? "Gördüm 👍" : "Gördüm, Bekliyorum 🛎️"}
-                  </button>
-                  <p style={{ marginTop: "8px", color: isComing ? "#cbd5e1" : "#22c55e", fontSize: "13px", fontWeight: "600", margin: "6px 0 0 0" }}>
-                    {isComing 
-                      ? "Siparişi beklediğinizi personele bildirdik." 
-                      : "Garson siparişinizi masanıza getirmek üzere!"}
+                <div style={{ marginTop: "18px", padding: "16px", borderRadius: "14px", background: "rgba(34, 197, 94, 0.1)", border: "1px solid rgba(34, 197, 94, 0.2)" }}>
+                  <span style={{ fontSize: "24px", display: "block", marginBottom: "6px" }}>🎉</span>
+                  <strong style={{ color: "#22c55e", fontSize: "15px", display: "block", marginBottom: "4px" }}>
+                    Siparişiniz Hazır!
+                  </strong>
+                  <p style={{ margin: "0 0 14px 0", color: "#cbd5e1", fontSize: "13px", lineHeight: "1.4" }}>
+                    Garsonumuz yemeğinizi sıcak sıcak masanıza getirmek üzere yola çıktı. Afiyet olsun! 🍕🍽️
                   </p>
+                  
+                  {/* Çağrı sesini durdurma butonu */}
+                  {notificationAudio && (
+                    <button
+                      onClick={() => {
+                        notificationAudio.pause();
+                        setNotificationAudio(null);
+                      }}
+                      style={{
+                        background: "#1e293b",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "#ef4444",
+                        padding: "8px 16px",
+                        borderRadius: "8px",
+                        fontWeight: "700",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        width: "100%",
+                        transition: "all 0.2s ease"
+                      }}
+                    >
+                      🔕 Alarmı Sustur
+                    </button>
+                  )}
                 </div>
               )}
 

@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import { API_URL } from "../config/api";
 function KitchenPage() {
-  const socket = io(API_URL);
   const [orders, setOrders] = useState([]);
-  const [showHistory, setShowHistory] =
-    useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [remindedOrders, setRemindedOrders] = useState({});
+  const [activeAlarm, setActiveAlarm] = useState(null);
 
   const fetchOrders = async () => {
     const response = await fetch(
@@ -18,24 +18,49 @@ function KitchenPage() {
   };
 
   useEffect(() => {
-   fetchOrders();
+    fetchOrders();
 
-   socket.on(
-    "orderUpdated",
-    () => {
+    const socket = io(API_URL);
+
+    socket.on("orderUpdated", () => {
       fetchOrders();
-    }
-   );
+    });
 
-   return () => {
-    socket.off("orderUpdated");
-   };
+    // Müşteriden gelen acil 'Siparişim Nerede?' sinyalini dinle
+    socket.on("kitchenReminder", (data) => {
+      setRemindedOrders((prev) => ({ ...prev, [data.id]: true }));
+      
+      // Mutfak personeli için uyarı sesi çal (Kapatılana kadar tekrar eder)
+      const alarm = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
+      alarm.volume = 0.4;
+      alarm.loop = true;
+      alarm.play().catch((e) => console.log("Ses çalma engellendi:", e));
+      setActiveAlarm(alarm);
+    });
+
+    return () => {
+      socket.off("orderUpdated");
+      socket.off("kitchenReminder");
+      socket.disconnect();
+    };
   }, []);
   
   const updateStatus = async (
     orderId,
     status
   ) => {
+    // Hazır veya Teslim Edildi durumuna basıldığında alarm sesini durdur
+    if (activeAlarm) {
+      activeAlarm.pause();
+      setActiveAlarm(null);
+    }
+    // Kartın etrafındaki kırmızı alarmı kaldır
+    setRemindedOrders((prev) => {
+      const updated = { ...prev };
+      delete updated[orderId];
+      return updated;
+    });
+
     await fetch(
       `${API_URL}/orders/${orderId}`,
       {
@@ -73,6 +98,13 @@ function KitchenPage() {
         padding: "30px",
       }}
     >
+      <style>{`
+        @keyframes pulse-red {
+          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); border-color: #ef4444; }
+          70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); border-color: rgba(239, 68, 68, 0.5); }
+          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); border-color: #ef4444; }
+        }
+      `}</style>
       <div
         style={{
           maxWidth: "1400px",
@@ -133,19 +165,40 @@ function KitchenPage() {
             gap: "24px",
           }}
         >
-          {activeOrders.map((order) => (
-            <div
-              key={order.id}
-              style={{
-                background: "#111827",
-                borderRadius: "18px",
-                padding: "16px",
-                border:
-                  "1px solid rgba(255,255,255,0.08)",
-                boxShadow:
-                  "0 20px 40px rgba(0,0,0,0.35)",
-              }}
-            >
+          {activeOrders.map((order) => {
+            const isReminded = remindedOrders[order.id];
+            return (
+              <div
+                key={order.id}
+                style={{
+                  background: "#111827",
+                  borderRadius: "18px",
+                  padding: "16px",
+                  border: isReminded 
+                    ? "2px solid #ef4444" 
+                    : "1px solid rgba(255,255,255,0.08)",
+                  boxShadow: isReminded 
+                    ? "0 0 20px rgba(239, 68, 68, 0.4)" 
+                    : "0 20px 40px rgba(0,0,0,0.35)",
+                  transition: "all 0.3s ease",
+                  animation: isReminded ? "pulse-red 2s infinite" : "none"
+                }}
+              >
+                {isReminded && (
+                  <div style={{
+                    background: "rgba(239, 68, 68, 0.15)",
+                    border: "1px solid #ef4444",
+                    color: "#ef4444",
+                    borderRadius: "10px",
+                    padding: "10px",
+                    fontSize: "12px",
+                    fontWeight: "bold",
+                    marginBottom: "12px",
+                    textAlign: "center"
+                  }}>
+                    🚨 BU MASA SİPARİŞİNİ BEKLİYOR!
+                  </div>
+                )}
               <div
                 style={{
                   display: "flex",
@@ -324,7 +377,8 @@ function KitchenPage() {
                 </button>
               </div>
             </div>
-          ))}
+          );
+        })}
         </div>
 
         <div
