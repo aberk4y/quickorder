@@ -19,12 +19,13 @@ function MenuPage() {
   const [selectedCategory, setSelectedCategory] = useState("Tümü");
   const [note, setNote] = useState("");
 
-  // Sayfa ilk açıldığında API üzerinden tüm ürün listesini getir
+  // Sayfa ilk açıldığında veya masa değiştikçe API üzerinden ürün listesini getir
   useEffect(() => {
     fetch(`${API_URL}/products`)
       .then((res) => res.json())
-      .then((data) => setProducts(data));
-  }, []);
+      .then((data) => setProducts(data))
+      .catch((err) => console.error("Ürünler yüklenemedi:", err));
+  }, [tableId]);
 
   /**
    * Sepete Ürün Ekleme (veya miktarını artırma)

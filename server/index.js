@@ -17,6 +17,13 @@ export const io = new Server(server, {
   },
 });
 
+// Sipariş aciliyet bildirimini (Siparişim Nerede?) mutfak paneline anlık ileten soket köprüsü
+io.on("connection", (socket) => {
+  socket.on("orderReminder", (data) => {
+    io.emit("kitchenReminder", data);
+  });
+});
+
 app.use(cors());
 
 app.use(express.json());
