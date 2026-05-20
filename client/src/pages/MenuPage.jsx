@@ -180,24 +180,48 @@ function MenuPage() {
           padding: "18px",
         }}
       >
-        <h1
-          style={{
-            margin: 0,
-            fontSize: "32px",
-            fontWeight: "800",
-          }}
-        >
-          QuickOrder
-        </h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: "32px",
+                fontWeight: "800",
+              }}
+            >
+              QuickOrder
+            </h1>
+            <p
+              style={{
+                marginTop: "4px",
+                color: "#cbd5e1",
+                margin: 0,
+              }}
+            >
+              Masa {tableId}
+            </p>
+          </div>
 
-        <p
-          style={{
-            marginTop: "8px",
-            color: "#cbd5e1",
-          }}
-        >
-          Table {tableId}
-        </p>
+          <button
+            onClick={() => navigate(`/status/${tableId}`)}
+            style={{
+              border: "none",
+              borderRadius: "14px",
+              padding: "10px 16px",
+              background: "linear-gradient(to right, #ea580c, #f97316)",
+              color: "white",
+              fontWeight: "700",
+              fontSize: "13px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              boxShadow: "0 6px 16px rgba(234, 88, 12, 0.25)",
+            }}
+          >
+            📋 Siparişlerim
+          </button>
+        </div>
       </div>
 
       <div
