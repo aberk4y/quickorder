@@ -25,16 +25,21 @@ function OrderStatusPage() {
    * Masa ID'sine göre filtrelenmiş ve henüz teslim edilmemiş siparişi bulur.
    */
   const fetchOrder = async () => {
-    const response = await fetch(`${API_URL}/orders`);
-    const data = await response.json();
+    try {
+      const response = await fetch(`${API_URL}/orders`);
+      const data = await response.json();
 
-    const order = data.find(
-      (order) =>
-        order.tableId == tableId &&
-        order.status !== "Teslim Edildi"
-    );
+      const order = data.find(
+        (order) =>
+          order.tableId == tableId &&
+          order.status !== "Teslim Edildi"
+      );
 
-    setActiveOrder(order);
+      setActiveOrder(order);
+    } catch (error) {
+      // API bağlantı hatası durumunda konsola yaz
+      console.error("Sipariş verileri alınamadı:", error);
+    }
   };
 
   // Sayfa yüklendiğinde siparişi çek ve Socket.io dinleyicisini başlat
@@ -112,6 +117,7 @@ function OrderStatusPage() {
     );
   }
 
+  // Duruma göre renk belirleme: Hazır ise yeşil, diğer durumlarda turuncu
   const statusColor = activeOrder.status === "Hazır" ? "#22c55e" : "#f97316";
 
   return (
@@ -187,6 +193,7 @@ function OrderStatusPage() {
           {customerComing ? "Geliyorum 👍" : "Tamam Geliyorum"}
         </button>
 
+        {/* Sipariş detayı: Ürün adı, miktarı ve fiyatı */}
         <div
           style={{
             marginTop: "30px",
@@ -216,6 +223,7 @@ function OrderStatusPage() {
           ))}
         </div>
 
+        {/* Siparişin toplam tutarı */}
         <h3
           style={{
             marginTop: "20px",
