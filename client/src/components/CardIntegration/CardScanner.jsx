@@ -13,27 +13,28 @@ const CardScanner = ({ onScanSuccess, onClose }) => {
     setIsProcessing(true);
     setStatusMessage("Görüntü analiz ediliyor, lütfen kamerayı sabit tutun...");
     
-    // Kameradan anlık ekran görüntüsü alıyoruz (Base64 formatında)
     const imageSrc = webcamRef.current.getScreenshot();
     
     if (imageSrc) {
       try {
-        // Tesseract.js v5+ standartlarına uygun işçi (worker) kurulumu
+        // Vite ve Webpack prod build'lerinde en kararlı çalışan Tesseract v5 asenkron akışı
         const worker = await createWorker('eng');
-        const { data: { text } } = await worker.recognize(imageSrc);
-        await worker.terminate(); // Belleği temizlemek için işçiyi hemen kapatıyoruz
+        const ret = await worker.recognize(imageSrc);
+        await worker.terminate(); // Bellek sızıntısını önlemek için hemen kapatıyoruz
+
+        const text = ret.data && ret.data.text ? ret.data.text : "";
 
         // Metindeki tüm boşlukları ve tireleri temizle, yan yana 16 haneli rakamı ara
         const cleanText = text.replace(/[\s-]/g, '');
         const cardNumberMatch = cleanText.match(/\d{16}/);
         
-        // Son kullanma tarihi tespiti için temel regex (AA/YY veya AA/YYYY)
+        // Son kullanma tarihi tespiti (AA/YY veya AA/YYYY)
         const expiryMatch = text.match(/(0[1-9]|1[0-2])\/([0-9]{2,4})/);
 
         if (cardNumberMatch) {
           setStatusMessage("Kart başarıyla okundu!");
           
-          // Kart numarasını kullanıcıya şık göstermek için 4'erli gruplara ayırıyoruz (0000 0000 0000 0000)
+          // Kart numarasını şık göstermek için 4'erli gruplara ayırıyoruz
           const formattedCardNumber = cardNumberMatch[0].replace(/(\d{4})/g, '$1 ').trim();
           
           onScanSuccess({
@@ -46,7 +47,7 @@ const CardScanner = ({ onScanSuccess, onClose }) => {
         setStatusMessage("Kart numarası net okunamadı. Lütfen ışığı ayarlayıp tekrar deneyin.");
       } catch (err) {
         console.error("OCR Hatası:", err);
-        setStatusMessage("Tarama motoru başlatılamadı veya bir hata oluştu.");
+        setStatusMessage("Tarama motorunda bir hata oluştu.");
       }
     } else {
       setStatusMessage("Kameradan görüntü alınamadı.");
@@ -56,10 +57,11 @@ const CardScanner = ({ onScanSuccess, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md transition-opacity">
-      <div className="relative w-full max-w-md p-6 mx-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl text-white">
+      <div className="relative w-full max-w-md p-6 mx-4 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl text-white" style={{ textAlign: 'left' }}>
         
         {/* Kapatma Butonu */}
         <button 
+          type="button"
           onClick={onClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800"
         >
@@ -79,7 +81,7 @@ const CardScanner = ({ onScanSuccess, onClose }) => {
             audio={false}
             ref={webcamRef}
             screenshotFormat="image/jpeg"
-            videoConstraints={{ facingMode: "environment" }} // Mobil cihazlarda arka kamerayı önceler
+            videoConstraints={{ facingMode: "environment" }}
             className="w-full h-full object-cover"
           />
           
@@ -90,7 +92,7 @@ const CardScanner = ({ onScanSuccess, onClose }) => {
                 ? 'border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.4)] animate-pulse' 
                 : 'border-emerald-500/80 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
             }`}>
-              <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-[11px] text-slate-200 bg-slate-950/80 px-2 py-0.5 rounded-full backdrop-blur-sm border border-slate-800 tesisat">
+              <div className="absolute -top-7 left-1/2 -translate-x-1/2 text-[11px] text-slate-200 bg-slate-950/80 px-2 py-0.5 rounded-full backdrop-blur-sm border border-slate-800">
                 Kartın Ön Yüzünü Hizalayın
               </div>
             </div>
