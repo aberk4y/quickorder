@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { API_URL } from "../config/api";
-import CardScanner from "../components/CardIntegration/CardScanner"; // Yazdığımız tarayıcı bileşeni buraya bağlandı
+import CardScanner from "../components/CardIntegration/CardScanner";
 
 function MenuPage() {
   const { tableId } = useParams();
