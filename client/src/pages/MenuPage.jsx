@@ -14,7 +14,8 @@ function MenuPage() {
 
   // Ödeme ve Tarama State Yapıları
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [nfcState, setNfcState] = useState("idle"); // idle, processing, success, error
+  const [paymentMode, setPaymentMode] = useState("selection"); // selection, nfc_scan, manual_card
+  const [nfcState, setNfcState] = useState("idle"); // idle, scanning, success, processing
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -79,7 +80,7 @@ function MenuPage() {
 
   const totalItems = cart.reduce((total, item) => total + item.quantity, 0);
 
-  // Siparişi Backend'e Gönderen Çekirdek Fonksiyon (iyzico onayı sonrası çalışır)
+  // Siparişi Backend'e Gönderen Çekirdek Fonksiyon
   const sendOrderToBackend = async (detectedCardSerial) => {
     const maxPrepTime = cart.reduce((max, item) => {
       const itemPrepTime = PREPARATION_TIMES[item.category] || 10;
@@ -119,6 +120,7 @@ function MenuPage() {
       setOrderNote("");
       setShowPaymentModal(false);
       setNfcState("idle");
+      setPaymentMode("selection");
     } catch (error) {
       console.error(error);
       setNfcState("idle");
@@ -126,26 +128,67 @@ function MenuPage() {
     }
   };
 
-  // Geliştirici konsol bypass modu (Hoca jürisinde simülasyon istersen korundu)
-  useEffect(() => {
-    if (showPaymentModal) {
-      window.simuleEt = () => {
-        console.log("Gizli test modu aktif edildi.");
+  // Hızlı iyzico Ödeme API Tetikleyicisi
+  const handleIyzicoPayment = async (cardDetails) => {
+    setNfcState("processing");
+    try {
+      const response = await fetch(`${API_URL}/api/payment/process`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cart,
+          totalPrice,
+          tableId,
+          cardDetails
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
         setNfcState("success");
         setTimeout(() => {
-          sendOrderToBackend("CONSOLE-BYPASS-IYZICO-100");
-        }, 1000);
-      };
+          sendOrderToBackend(result.paymentId);
+        }, 1500);
+      } else {
+        alert(result.message);
+        setNfcState("idle");
+        if (paymentMode === "nfc_scan") setPaymentMode("selection");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("iyzico bağlantı hatası oluştu.");
+      setNfcState("idle");
+      if (paymentMode === "nfc_scan") setPaymentMode("selection");
     }
-    return () => {
-      delete window.simuleEt;
-    };
-  }, [showPaymentModal, cart, orderNote]);
+  };
+
+  // NFC Butonuna Basıldığında Hızlı Doldurma Simülasyonunu Başlatan Fonksiyon
+  const startNfcFastFillSimulate = () => {
+    setPaymentMode("nfc_scan");
+    setNfcState("scanning");
+
+    // 2 saniye radar dönecek, sanki telefonu masaya/karta dokundurmuş gibi simüle edecek
+    setTimeout(() => {
+      // Resmi Başarılı iyzico Test Kart Bilgileri Otomatik Enjekte Ediliyor
+      const autoFilledCard = {
+        cardHolderName: "Berkay Aras (NFC Temassız)",
+        cardNumber: "5890040000000016",
+        expiryMonth: "12",
+        expiryYear: "28",
+        cvv: "123"
+      };
+      
+      // Doğrudan iyzico API'sine gönderiyoruz
+      handleIyzicoPayment(autoFilledCard);
+    }, 2000);
+  };
 
   const closeNfcModal = () => {
-    if (nfcState === "processing") return; // Ödeme anında kapatılmasın
+    if (nfcState === "processing") return; 
     setShowPaymentModal(false);
     setNfcState("idle");
+    setPaymentMode("selection");
     setErrorMessage("");
   };
 
@@ -405,6 +448,24 @@ function MenuPage() {
     nfcIcon: {
       fontSize: "48px",
       zIndex: 2,
+    },
+    actionButtonGroup: {
+      display: "flex",
+      flexDirection: "column",
+      gap: "14px",
+      marginTop: "24px"
+    },
+    secondaryBtn: {
+      width: "100%",
+      padding: "16px",
+      border: "1px solid rgba(255, 255, 255, 0.15)",
+      borderRadius: "16px",
+      backgroundColor: "rgba(255, 255, 255, 0.05)",
+      color: "#ffffff",
+      fontSize: "15px",
+      fontWeight: "600",
+      cursor: "pointer",
+      transition: "background 0.2s",
     }
   };
 
@@ -513,7 +574,7 @@ function MenuPage() {
           </div>
         )}
 
-        {/* Gerçek Fiziksel iyzico Ödeme Modalı */}
+        {/* Çok Fonksiyonlu Güvenli Ödeme Modalı */}
         {showPaymentModal && (
           <div style={styles.modalOverlay}>
             <div style={styles.modalSheet}>
@@ -527,53 +588,64 @@ function MenuPage() {
                 </button>
               </div>
               <div style={{ color: "#8e8e93", fontSize: "14px", marginTop: "4px", textAlign: "left" }}>
-                Masa {tableId} • iyzico Altyapısı ile Korumalı
+                Masa {tableId} • Toplam Tutar: {totalPrice} ₺
               </div>
 
-              {/* Başarılı Onay Ekranı */}
-              {nfcState === "success" ? (
-                <div style={styles.nfcRadarContainer}>
-                  <div style={{ ...styles.nfcIcon, color: "#30d158", animation: "bounceClick 0.4s ease" }}>✓</div>
-                  <div style={{ fontSize: "16px", fontWeight: "600", marginTop: "10px" }}>Ödeme Başarılı!</div>
+              {/* AŞAMA 1: ÖDEME YÖNTEMİ SEÇİM EKRANI */}
+              {paymentMode === "selection" && (
+                <div style={styles.actionButtonGroup}>
+                  <button onClick={startNfcFastFillSimulate} style={{ ...styles.checkoutBtn, backgroundColor: "#ffffff", color: "#000000" }}>
+                    📟 NFC Masa Teması (Hızlı Öde)
+                  </button>
+                  <button onClick={() => setPaymentMode("manual_card")} style={styles.secondaryBtn}>
+                    💳 Kredi / Banka Kartı ile Öde
+                  </button>
                 </div>
-              ) : (
-                /* Doğrudan iyzico Kart Formunu Başlatıyoruz */
-                <CardForm 
-                  totalPrice={totalPrice}
-                  isProcessing={nfcState === "processing"}
-                  onSubmit={async (cardDetails) => {
-                    setNfcState("processing");
-                    
-                    try {
-                      const response = await fetch(`${API_URL}/api/payment/process`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          cart,
-                          totalPrice,
-                          tableId,
-                          cardDetails
-                        })
-                      });
+              )}
 
-                      const result = await response.json();
+              {/* AŞAMA 2: NFC TARAMA VE ANİMASYON EKRANI */}
+              {paymentMode === "nfc_scan" && (
+                <>
+                  <div style={styles.nfcRadarContainer}>
+                    {nfcState === "scanning" && (
+                      <>
+                        <div className="radar-wave wave1"></div>
+                        <div className="radar-wave wave2"></div>
+                        <div className="radar-wave wave3"></div>
+                      </>
+                    )}
+                    <div style={{
+                      ...styles.nfcIcon,
+                      animation: nfcState === "success" ? "bounceClick 0.4s ease" : "none",
+                      color: nfcState === "success" ? "#30d158" : nfcState === "scanning" ? "#0a84ff" : "#ffffff"
+                    }}>
+                      {nfcState === "success" ? "✓" : nfcState === "processing" ? "⏳" : "📟"} 
+                    </div>
+                  </div>
+                  <div style={{ fontSize: "15px", fontWeight: "600", color: "#ffffff", marginBottom: "30px" }}>
+                    {nfcState === "scanning" && "Cihaz Masaya Dokunduruluyor (Kart Enjekte Ediliyor)..."}
+                    {nfcState === "processing" && "iyzico Güvenli Bağlantısı Kuruluyor..."}
+                    {nfcState === "success" && "Ödeme Başarılı! Sipariş İletiliyor..."}
+                  </div>
+                </>
+              )}
 
-                      if (result.success) {
-                        setNfcState("success");
-                        setTimeout(() => {
-                          sendOrderToBackend(result.paymentId);
-                        }, 1500);
-                      } else {
-                        alert(result.message);
-                        setNfcState("idle");
-                      }
-                    } catch (error) {
-                      console.error(error);
-                      alert("iyzico bağlantı hatası oluştu.");
-                      setNfcState("idle");
-                    }
-                  }}
-                />
+              {/* AŞAMA 3: MANUEL iYZİCO KART FORMU EKRANI */}
+              {paymentMode === "manual_card" && (
+                <div style={{ marginTop: "16px" }}>
+                  {nfcState === "success" ? (
+                    <div style={styles.nfcRadarContainer}>
+                      <div style={{ ...styles.nfcIcon, color: "#30d158" }}>✓</div>
+                      <div style={{ fontSize: "16px", fontWeight: "600", marginTop: "10px" }}>Ödeme Başarılı!</div>
+                    </div>
+                  ) : (
+                    <CardForm 
+                      totalPrice={totalPrice}
+                      isProcessing={nfcState === "processing"}
+                      onSubmit={handleIyzicoPayment}
+                    />
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -584,6 +656,22 @@ function MenuPage() {
       <style>{`
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         @keyframes bounceClick { 0% { transform: scale(1); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+        .radar-wave {
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          border: 2px solid #0a84ff;
+          borderRadius: 50%;
+          opacity: 0;
+          animation: wavePulse 2s infinite linear;
+        }
+        .wave2 { animation-delay: 0.6s; }
+        .wave3 { animation-delay: 1.2s; }
+        @keyframes wavePulse {
+          0% { transform: scale(0.6); opacity: 0; }
+          50% { opacity: 0.4; }
+          100% { transform: scale(1.4); opacity: 0; }
+        }
       `}</style>
     </div>
   );
