@@ -545,7 +545,7 @@ function MenuPage() {
                     setNfcState("processing");
                     
                     try {
-                      const response = await fetch(`${API_URL}/payment/process`, {
+                      const response = await fetch(`${API_URL}/api/payment/process`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
