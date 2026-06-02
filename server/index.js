@@ -95,12 +95,12 @@ app.post('/api/payment/process', (req, res) => {
             zipCode: '34000'
         },
         basketItems: cart.map((item) => ({
-            id: 'PR' + item.id,
-            name: item.name,
-            category: item.category || 'Yemek',
-            itemType: Iyzipay.BASKET_ITEM_TYPE.PHYSICAL,
-            price: (item.price * item.quantity).toString()
-        }))
+    id: 'PR' + item.id,
+    name: item.name,
+    category1: item.category || 'Yemek', // <--- category1 yaptık!
+    itemType: Iyzipay.BASKET_ITEM_TYPE.PHYSICAL,
+    price: (item.price * item.quantity).toString()
+}))
     };
 
     iyzipay.payment.create(requestData, function (err, result) {
