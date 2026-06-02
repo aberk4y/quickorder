@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { API_URL } from "../config/api";
+import CardScanner from "../components/CardIntegration/CardScanner"; // Yazdığımız tarayıcı bileşeni buraya bağlandı
 
 function MenuPage() {
   const { tableId } = useParams();
@@ -11,8 +12,9 @@ function MenuPage() {
   const [orderNote, setOrderNote] = useState(""); 
   const [selectedCategory, setSelectedCategory] = useState("Tümü");
 
-  // Gerçek Web NFC API State Yapıları
+  // Ödeme ve Tarama State Yapıları
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showCameraScanner, setShowCameraScanner] = useState(false); // Kamera açma/kapama state'i
   const [nfcState, setNfcState] = useState("idle"); // idle, scanning, success, error, unsupported
   const [errorMessage, setErrorMessage] = useState("");
   const [nfcReaderInstance, setNfcReaderInstance] = useState(null);
@@ -79,7 +81,7 @@ function MenuPage() {
 
   const totalItems = cart.reduce((total, item) => total + item.quantity, 0);
 
-  // Siparişi Backend'e Gönderen Çekirdek Fonksiyon
+  // Siparişi Backend'e Gönderen Çekirdek Fonksiyon (NFC veya Kamera fark etmeksizin çalışır)
   const sendOrderToBackend = async (detectedCardSerial) => {
     const maxPrepTime = cart.reduce((max, item) => {
       const itemPrepTime = PREPARATION_TIMES[item.category] || 10;
@@ -92,7 +94,9 @@ function MenuPage() {
       totalPrice,
       note: orderNote,
       estimatedTime: maxPrepTime,
-      paymentMethod: `NFC Temassız (Kart UID: ${detectedCardSerial})`,
+      paymentMethod: detectedCardSerial.startsWith("CARD-") 
+        ? `Kamera OCR (Kart: ${detectedCardSerial})` 
+        : `NFC Temassız (Kart UID: ${detectedCardSerial})`,
     };
 
     try {
@@ -126,7 +130,7 @@ function MenuPage() {
     }
   };
 
-  // Geliştirici Arka Kapısı: Eğer NFC'siz cihazda test etmek istersen tarayıcı konsoluna window.simuleEt() yazman yeterli.
+  // Geliştirici konsol bypass modu
   useEffect(() => {
     if (showPaymentModal) {
       window.simuleEt = () => {
@@ -146,7 +150,7 @@ function MenuPage() {
   const startFizikselNfcScan = async () => {
     if (!("NDEFReader" in window)) {
       setNfcState("unsupported");
-      setErrorMessage("Bu cihaz veya tarayıcı Web NFC donanım standartlarını desteklemiyor. (Android Chrome ve HTTPS bağlantı gerekir)");
+      setErrorMessage("Bu cihaz veya tarayıcı Web NFC donanım standartlarını desteklemiyor. Banka kartları için lütfen Kamera ile Tara seçeneğini kullanın.");
       return;
     }
 
@@ -169,18 +173,29 @@ function MenuPage() {
 
       ndef.onreadingerror = () => {
         setNfcState("error");
-        setErrorMessage("Kart okuma hatası. Lütfen kartı telefonun arkasına sabit tutun.");
+        setErrorMessage("Kart okuma hatası. İstanbulkart dışındaki şifreli EMV banka kartlarında hata alınabilir. Lütfen kamera taramasını deneyin.");
       };
 
     } catch (error) {
       console.error("NFC Hatası:", error);
       setNfcState("error");
-      setErrorMessage("NFC donanımına erişilemedi veya gerekli izin verilmedi.");
+      setErrorMessage("NFC donanımına erişilemedi. Banka kartları güvenlik nedeniyle kısıtlanmış olabilir.");
     }
+  };
+
+  // Kameradan kart bilgisi başarıyla okunduğunda tetiklenecek fonksiyon
+  const handleCameraScanSuccess = (scannedData) => {
+    setShowCameraScanner(false);
+    setNfcState("success");
+    // Başarıyla taranan kart numarasını arka plana maskeleyerek gönderiyoruz
+    setTimeout(() => {
+      sendOrderToBackend(`CARD-${scannedData.cardNumber.substring(0, 7)}****`);
+    }, 1000);
   };
 
   const closeNfcModal = () => {
     setShowPaymentModal(false);
+    setShowCameraScanner(false);
     setNfcState("idle");
     setErrorMessage("");
     if (nfcReaderInstance) {
@@ -444,6 +459,23 @@ function MenuPage() {
     nfcIcon: {
       fontSize: "48px",
       zIndex: 2,
+    },
+    // Yeni eklenen buton grubu stili
+    actionButtonGroup: {
+      display: "flex",
+      gap: "12px",
+      marginTop: "10px"
+    },
+    secondaryBtn: {
+      flex: 1,
+      padding: "16px",
+      border: "1px solid rgba(255, 255, 255, 0.15)",
+      borderRadius: "16px",
+      backgroundColor: "rgba(255, 255, 255, 0.05)",
+      color: "#ffffff",
+      fontSize: "15px",
+      fontWeight: "600",
+      cursor: "pointer",
     }
   };
 
@@ -552,7 +584,7 @@ function MenuPage() {
           </div>
         )}
 
-        {/* Gerçek Fiziksel NFC Temassız Ödeme Modalı (Hocaya Karşı Kusursuzlaştırıldı) */}
+        {/* Gerçek Fiziksel Ödeme Modalı (NFC + Kamera Entegre Edildi) */}
         {showPaymentModal && (
           <div style={styles.modalOverlay}>
             <div style={styles.modalSheet}>
@@ -569,37 +601,59 @@ function MenuPage() {
                 Masa {tableId} • Toplam Tutar: {totalPrice} ₺
               </div>
 
-              <div style={styles.nfcRadarContainer}>
-                {nfcState === "scanning" && (
-                  <>
-                    <div className="radar-wave wave1"></div>
-                    <div className="radar-wave wave2"></div>
-                    <div className="radar-wave wave3"></div>
-                  </>
-                )}
-                
-                <div style={{
-                  ...styles.nfcIcon,
-                  animation: nfcState === "success" ? "bounceClick 0.4s ease" : "none",
-                  color: nfcState === "success" ? "#30d158" : nfcState === "scanning" ? "#0a84ff" : nfcState === "error" || nfcState === "unsupported" ? "#ff453a" : "#ffffff"
-                }}>
-                  {nfcState === "success" ? "✓" : nfcState === "unsupported" || nfcState === "error" ? "⚠️" : "📟"} 
+              {/* Kamera Tarayıcı Aktif Değilken NFC Radar Görünümü Çıkar */}
+              {!showCameraScanner ? (
+                <>
+                  <div style={styles.nfcRadarContainer}>
+                    {nfcState === "scanning" && (
+                      <>
+                        <div className="radar-wave wave1"></div>
+                        <div className="radar-wave wave2"></div>
+                        <div className="radar-wave wave3"></div>
+                      </>
+                    )}
+                    
+                    <div style={{
+                      ...styles.nfcIcon,
+                      animation: nfcState === "success" ? "bounceClick 0.4s ease" : "none",
+                      color: nfcState === "success" ? "#30d158" : nfcState === "scanning" ? "#0a84ff" : nfcState === "error" || nfcState === "unsupported" ? "#ff453a" : "#ffffff"
+                    }}>
+                      {nfcState === "success" ? "✓" : nfcState === "unsupported" || nfcState === "error" ? "⚠️" : "📟"} 
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: "15px", fontWeight: "600", color: "#ffffff", marginBottom: "30px", minHeight: "44px", padding: "0 10px", lineHeight: "1.4" }}>
+                    {nfcState === "idle" && "Fiziksel Kartınızı Okutmaya Hazırlanın"}
+                    {nfcState === "scanning" && "Kartınızı Telefonun Arkasına Dokundurun..."}
+                    {nfcState === "success" && "Kart Okundu! Sipariş Gönderiliyor..."}
+                    {(nfcState === "error" || nfcState === "unsupported") && (
+                      <span style={{ color: "#ff453a", fontSize: "13px", fontWeight: "500" }}>{errorMessage}</span>
+                    )}
+                  </div>
+
+                  {/* Yan Yana İki Buton: Donanımı Aktif Et ve Kamera ile Tara */}
+                  <div style={styles.actionButtonGroup}>
+                    {nfcState === "idle" && (
+                      <button onClick={startFizikselNfcScan} style={{ ...styles.checkoutBtn, flex: 1, backgroundColor: "#ffffff", color: "#000000" }}>
+                        NFC ile Okut
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => setShowCameraScanner(true)} 
+                      style={nfcState === "idle" ? styles.secondaryBtn : styles.checkoutBtn}
+                    >
+                      📷 Kamera ile Tara
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Kamera Butonuna Basıldığında Devreye Giren CardScanner Bileşeni */
+                <div style={{ marginTop: "24px", paddingBottom: "20px" }}>
+                  <CardScanner 
+                    onScanSuccess={handleCameraScanSuccess} 
+                    onClose={() => setShowCameraScanner(false)} 
+                  />
                 </div>
-              </div>
-
-              <div style={{ fontSize: "15px", fontWeight: "600", color: "#ffffff", marginBottom: "30px", minHeight: "44px", padding: "0 10px", lineHeight: "1.4" }}>
-                {nfcState === "idle" && "Fiziksel Kartınızı Okutmaya Hazırlanın"}
-                {nfcState === "scanning" && "Kartınızı Telefonun Arkasına Dokundurun..."}
-                {nfcState === "success" && "Kart Okundu! Sipariş Gönderiliyor..."}
-                {(nfcState === "error" || nfcState === "unsupported") && (
-                  <span style={{ color: "#ff453a", fontSize: "13px", fontWeight: "500" }}>{errorMessage}</span>
-                )}
-              </div>
-
-              {nfcState === "idle" && (
-                <button onClick={startFizikselNfcScan} style={{ ...styles.checkoutBtn, backgroundColor: "#ffffff", color: "#000000" }}>
-                  Donanımı Aktif Et (Kartı Dokundur)
-                </button>
               )}
             </div>
           </div>
